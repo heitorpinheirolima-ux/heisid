@@ -27,11 +27,13 @@ function toggleCollapse() {
   aplicarSidebar();
 }
 function aplicarSidebar() {
-  const sb = document.getElementById('sidebar');
-  const mw = document.getElementById('main-wrapper');
+  const sb  = document.getElementById('sidebar');
+  const mw  = document.getElementById('main-wrapper');
+  const btn = document.querySelector('.sidebar-collapse-btn');
   if (!sb || !mw) return;
   sb.classList.toggle('collapsed', SIDEBAR_COLLAPSED);
   mw.classList.toggle('collapsed', SIDEBAR_COLLAPSED);
+  if (btn) btn.textContent = SIDEBAR_COLLAPSED ? '▶' : '◀';
 }
 function toggleSidebar() {
   const sb = document.getElementById('sidebar');
@@ -191,6 +193,7 @@ const MENUS = {
     { group: 'GESTÃO' },
     { icon: '📦', label: 'Estoque',       page: 'estoque' },
     { icon: '📈', label: 'Relatórios',    page: 'relatorios' },
+    { icon: '🔑', label: 'Acessos',       page: 'acessos' },
     { icon: '⚙️', label: 'Configurações', page: 'configuracoes' },
   ],
   revendedor: [
@@ -238,7 +241,7 @@ const PAGE_TITLES = {
   dashboard: 'Dashboard', pedidos: 'Pedidos', produtos: 'Produtos',
   clientes: 'Clientes', revendedores: 'Revendedores', vendas: 'Vendas',
   pendencias: 'Pendências', estoque: 'Estoque', relatorios: 'Relatórios',
-  configuracoes: 'Configurações',
+  acessos: 'Acessos & Usuários', configuracoes: 'Configurações',
   'rev-dashboard': 'Meu Painel', 'rev-vendas': 'Minhas Vendas',
   'rev-clientes': 'Meus Clientes', 'rev-estoque': 'Meu Estoque', 'rev-acerto': 'Acerto',
   'cli-pedidos': 'Meus Pedidos', 'cli-pendencias': 'Pendências', 'cli-perfil': 'Meu Perfil',
@@ -253,6 +256,7 @@ const PAGINAS = {
   pendencias:       pagPendencias,
   estoque:          pagEstoque,
   relatorios:       pagRelatorios,
+  acessos:          pagAcessos,
   configuracoes:    pagConfiguracoes,
   'rev-dashboard':  pagRevDashboard,
   'rev-vendas':     pagRevVendas,
@@ -1735,6 +1739,185 @@ async function salvarPerfil() {
     if (ok) { ok.style.display='flex'; setTimeout(()=>ok.style.display='none',3000); }
   } else {
     if (err) { err.style.display='flex'; err.textContent=r?.erro||'Erro ao salvar'; }
+  }
+}
+
+// ════════════════════════════════════════════════════
+// ADMIN — ACESSOS & USUÁRIOS
+// ════════════════════════════════════════════════════
+async function pagAcessos(c) {
+  c.innerHTML = `
+  <div class="page-header">
+    <div><div class="page-title">Acessos & Usuários</div><div class="page-sub">Gerencie administradores e revendedores</div></div>
+    <button class="btn btn-primary" onclick="abrirModalNovoUsuario()">+ Novo Usuário</button>
+  </div>
+  <div id="ac-wrap"><div class="spinner"></div></div>
+
+  <!-- Modal novo/editar usuário -->
+  <div class="modal-overlay" id="ac-modal" onclick="if(event.target===this)fecharModalAcesso()">
+    <div class="modal" style="max-width:460px">
+      <div class="modal-header">
+        <span class="modal-title" id="ac-modal-titulo">Novo Usuário</span>
+        <button class="modal-close" onclick="fecharModalAcesso()">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="ac-id">
+        <div class="field"><label>Nome completo *</label><input type="text" id="ac-nome" placeholder="Nome do usuário"></div>
+        <div class="field"><label>E-mail *</label><input type="email" id="ac-email" placeholder="email@exemplo.com"></div>
+        <div class="field">
+          <label>Perfil *</label>
+          <select id="ac-perfil">
+            <option value="admin">👑 Administrador</option>
+            <option value="revendedor">🤝 Revendedor</option>
+          </select>
+        </div>
+        <div class="field" id="ac-senha-field">
+          <label>Senha * <span style="font-weight:400;color:var(--text-3)">(mín. 6 caracteres)</span></label>
+          <input type="password" id="ac-senha" placeholder="••••••••">
+        </div>
+        <div class="field" id="ac-nova-senha-field" style="display:none">
+          <label>Nova senha <span style="font-weight:400;color:var(--text-3)">(deixe em branco para manter)</span></label>
+          <input type="password" id="ac-nova-senha" placeholder="••••••••">
+        </div>
+        <div id="ac-erro" class="alert alert-error" style="display:none"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="fecharModalAcesso()">Cancelar</button>
+        <button class="btn btn-primary" style="flex:1;justify-content:center" id="ac-salvar-btn" onclick="salvarUsuarioAcesso()">Salvar</button>
+      </div>
+    </div>
+  </div>`;
+
+  await carregarUsuarios();
+}
+
+async function carregarUsuarios() {
+  const wrap = document.getElementById('ac-wrap');
+  if (!wrap) return;
+  const data = await api('/usuarios');
+  const usuarios = data.usuarios || data || [];
+
+  if (!usuarios.length) {
+    wrap.innerHTML = '<div class="empty-state"><div class="empty-icon">👤</div><p>Nenhum usuário cadastrado</p></div>';
+    return;
+  }
+
+  const perfilBadge = p => ({
+    admin:      '<span class="badge badge-blue">👑 Admin</span>',
+    revendedor: '<span class="badge badge-purple">🤝 Revendedor</span>',
+    cliente:    '<span class="badge badge-green">🛒 Cliente</span>',
+  })[p] || `<span class="badge">${p}</span>`;
+
+  const statusBadge = a => a
+    ? '<span class="badge badge-green">Ativo</span>'
+    : '<span class="badge badge-red">Inativo</span>';
+
+  wrap.innerHTML = `
+  <div class="card">
+    <div class="table-wrap"><table>
+      <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Status</th><th>Criado em</th><th></th></tr></thead>
+      <tbody>
+        ${usuarios.map(u => `<tr>
+          <td><strong>${u.nome}</strong></td>
+          <td style="color:var(--text-3)">${u.email}</td>
+          <td>${perfilBadge(u.perfil)}</td>
+          <td>${statusBadge(u.ativo)}</td>
+          <td>${fmtDataSimples(u.criado_em)}</td>
+          <td>
+            <div style="display:flex;gap:6px;justify-content:flex-end">
+              <button class="btn btn-xs btn-outline" onclick="editarUsuarioAcesso(${u.id},'${u.nome.replace(/'/g,"\\'")}','${u.email}','${u.perfil}')">✏️ Editar</button>
+              ${u.perfil !== 'cliente' && u.id !== ME.id ? `
+                <button class="btn btn-xs ${u.ativo ? 'btn-outline' : 'btn-primary'}" onclick="toggleAtivoUsuario(${u.id},${u.ativo})">
+                  ${u.ativo ? '🔒 Desativar' : '✅ Ativar'}
+                </button>` : ''}
+            </div>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>
+  </div>`;
+}
+
+function abrirModalNovoUsuario() {
+  document.getElementById('ac-modal-titulo').textContent = 'Novo Usuário';
+  document.getElementById('ac-id').value        = '';
+  document.getElementById('ac-nome').value      = '';
+  document.getElementById('ac-email').value     = '';
+  document.getElementById('ac-perfil').value    = 'admin';
+  document.getElementById('ac-senha').value     = '';
+  document.getElementById('ac-senha-field').style.display      = '';
+  document.getElementById('ac-nova-senha-field').style.display = 'none';
+  document.getElementById('ac-salvar-btn').textContent = 'Criar usuário';
+  document.getElementById('ac-erro').style.display = 'none';
+  document.getElementById('ac-modal').classList.add('show');
+  setTimeout(() => document.getElementById('ac-nome').focus(), 100);
+}
+
+function editarUsuarioAcesso(id, nome, email, perfil) {
+  document.getElementById('ac-modal-titulo').textContent = 'Editar Usuário';
+  document.getElementById('ac-id').value        = id;
+  document.getElementById('ac-nome').value      = nome;
+  document.getElementById('ac-email').value     = email;
+  document.getElementById('ac-perfil').value    = perfil;
+  document.getElementById('ac-senha-field').style.display      = 'none';
+  document.getElementById('ac-nova-senha-field').style.display = '';
+  document.getElementById('ac-nova-senha').value = '';
+  document.getElementById('ac-salvar-btn').textContent = 'Salvar alterações';
+  document.getElementById('ac-erro').style.display = 'none';
+  document.getElementById('ac-modal').classList.add('show');
+}
+
+function fecharModalAcesso() {
+  document.getElementById('ac-modal').classList.remove('show');
+}
+
+async function salvarUsuarioAcesso() {
+  const id     = document.getElementById('ac-id').value;
+  const nome   = (document.getElementById('ac-nome').value || '').trim();
+  const email  = (document.getElementById('ac-email').value || '').trim();
+  const perfil = document.getElementById('ac-perfil').value;
+  const senha  = id
+    ? (document.getElementById('ac-nova-senha').value || '')
+    : (document.getElementById('ac-senha').value || '');
+  const erro   = document.getElementById('ac-erro');
+  const btn    = document.getElementById('ac-salvar-btn');
+
+  erro.style.display = 'none';
+  if (!nome || !email) { erro.style.display='flex'; erro.textContent='Preencha nome e e-mail'; return; }
+  if (!id && senha.length < 6) { erro.style.display='flex'; erro.textContent='Senha deve ter mínimo 6 caracteres'; return; }
+
+  btn.disabled = true; btn.textContent = 'Salvando...';
+
+  let r;
+  if (id) {
+    const body = { nome, perfil };
+    if (senha) body.senha = senha;
+    r = await api(`/usuarios/${id}`, { method: 'PATCH', body });
+  } else {
+    r = await api('/usuarios', { method: 'POST', body: { nome, email, senha, perfil } });
+  }
+
+  btn.disabled = false;
+  btn.textContent = id ? 'Salvar alterações' : 'Criar usuário';
+
+  if (r && !r.erro) {
+    fecharModalAcesso();
+    toast(id ? 'Usuário atualizado!' : 'Usuário criado com sucesso!', 'success');
+    await carregarUsuarios();
+  } else {
+    erro.style.display = 'flex';
+    erro.textContent = r?.erro || 'Erro ao salvar usuário';
+  }
+}
+
+async function toggleAtivoUsuario(id, ativoAtual) {
+  const novoStatus = ativoAtual ? 0 : 1;
+  const r = await api(`/usuarios/${id}`, { method: 'PATCH', body: { ativo: novoStatus } });
+  if (r && !r.erro) {
+    toast(novoStatus ? 'Usuário ativado!' : 'Usuário desativado!', novoStatus ? 'success' : '');
+    await carregarUsuarios();
+  } else {
+    toast(r?.erro || 'Erro ao alterar status', 'error');
   }
 }
 

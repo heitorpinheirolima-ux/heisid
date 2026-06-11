@@ -18,6 +18,7 @@ app.use('/api/clientes',      require('./routes/clientes'));
 app.use('/api/vendas',        require('./routes/vendas'));
 app.use('/api/revendedores',  require('./routes/revendedores'));
 app.use('/api/admin',         require('./routes/admin'));
+app.use('/api/usuarios',      require('./routes/usuarios'));
 app.use('/api/configuracoes', require('./routes/configuracoes'));
 
 // ─── Painel SPA ───────────────────────────────────────────────
