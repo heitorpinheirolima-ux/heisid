@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HeiSid — Painel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css?v=2">
+  <style>
+    body { overflow: hidden; }
+    .app-shell { height: 100vh; overflow: hidden; }
+    .main-wrapper { height: 100vh; overflow-y: auto; display: flex; flex-direction: column; }
+    #page-content { flex: 1; }
+
+    /* ─── Auth Gate ─── */
+    #auth-gate {
+      position: fixed; inset: 0;
+      background: var(--bg);
+      z-index: 9999;
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+      transition: opacity .3s ease;
+    }
+    .gate-card {
+      background: var(--surface);
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      box-shadow: 0 12px 48px rgba(15,23,42,.16);
+      width: 100%; max-width: 420px;
+      overflow: hidden;
+    }
+    .gate-hero {
+      background: linear-gradient(135deg, var(--blue-9) 0%, var(--blue-7) 100%);
+      padding: 36px 28px 28px;
+      text-align: center;
+      position: relative; overflow: hidden;
+    }
+    .gate-hero::before {
+      content: '🍰';
+      position: absolute;
+      font-size: 120px; opacity: .06;
+      bottom: -20px; right: -10px;
+      pointer-events: none;
+    }
+    .gate-logo  { font-size: 44px; margin-bottom: 10px; }
+    .gate-title { font-family: var(--font-brand); font-size: 26px; font-weight: 800; color: #fff; }
+    .gate-sub   { font-size: 12px; color: rgba(255,255,255,.45); margin-top: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
+    .gate-body  { padding: 28px; }
+    .gate-hint  {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--blue-1); border: 1px solid var(--blue-2);
+      border-radius: 10px; padding: 10px 14px;
+      font-size: 12px; font-weight: 600; color: var(--blue-8);
+      margin-bottom: 20px;
+    }
+    [data-theme="dark"] .gate-hint { background: rgba(37,99,235,.12); border-color: rgba(37,99,235,.2); color: var(--blue-3); }
+    .gate-footer {
+      padding: 0 28px 22px;
+      text-align: center;
+      font-size: 12px; color: var(--text-3);
+    }
+    .gate-footer a { color: var(--blue-5); text-decoration: none; font-weight: 600; }
+    .gate-footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body class="sweet-bg">
+
+<!-- ═══ AUTH GATE — exibido enquanto não autenticado ═══ -->
+<div id="auth-gate">
+  <div class="gate-card">
+    <div class="gate-hero">
+      <div class="gate-logo">🍰</div>
+      <div class="gate-title">HeiSid</div>
+      <div class="gate-sub">Painel Administrativo</div>
+    </div>
+    <div class="gate-body">
+      <div class="gate-hint">
+        <span>🔒</span>
+        <span>Acesso restrito a administradores e revendedores</span>
+      </div>
+      <div class="field">
+        <label>E-mail</label>
+        <input type="email" id="gate-email" placeholder="seu@email.com" autocomplete="email">
+      </div>
+      <div class="field">
+        <label>Senha</label>
+        <input type="password" id="gate-senha" placeholder="••••••••" onkeydown="if(event.key==='Enter')gateLogin()">
+      </div>
+      <div id="gate-erro" class="alert alert-error" style="display:none;margin-bottom:14px"></div>
+      <button class="btn btn-primary btn-block" style="font-size:15px;padding:13px" onclick="gateLogin()" id="gate-btn">
+        Entrar no Painel →
+      </button>
+    </div>
+    <div class="gate-footer">
+      <a href="/">← Voltar para a loja</a>
+      &nbsp;·&nbsp;
+      <button onclick="toggleThemeGate()" style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:12px">🌙 Tema</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ APP SHELL (hidden until authenticated) ═══ -->
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+<div class="app-shell" id="app-shell" style="display:none">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">🍰</div>
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-name">HeiSid</div>
+        <div class="sidebar-brand-sub">Gestão de Doces</div>
+      </div>
+      <button class="sidebar-collapse-btn" onclick="toggleCollapse()" title="Recolher menu">◀</button>
+    </div>
+    <div class="sidebar-user" id="sidebar-user">
+      <div class="user-av" id="user-av">A</div>
+      <div class="user-info">
+        <div class="user-name" id="user-name">Carregando...</div>
+        <div class="user-role" id="user-role">—</div>
+      </div>
+    </div>
+    <ul class="nav-menu" id="nav-menu"></ul>
+    <div class="sidebar-footer">
+      <button class="btn-logout" onclick="logout()">
+        <span>🚪</span><span class="nav-label">Sair</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main-wrapper" id="main-wrapper">
+    <header class="topbar">
+      <button class="topbar-menu-btn" onclick="toggleSidebar()">☰</button>
+      <div class="topbar-left">
+        <h2 class="topbar-title" id="topbar-title">Painel</h2>
+        <span class="topbar-sub" id="topbar-sub">HeiSid</span>
+      </div>
+      <div class="topbar-actions">
+        <div class="topbar-search">
+          <span>🔍</span>
+          <input type="text" id="topbar-search" placeholder="Pesquisar..." autocomplete="off">
+        </div>
+        <button class="topbar-icon-btn" onclick="toggleTheme()" title="Alternar tema">🌙</button>
+        <div class="topbar-icon-btn" id="notif-btn" style="cursor:pointer">
+          🔔
+          <span class="topbar-notif-dot" id="notif-dot" style="display:none"></span>
+        </div>
+      </div>
+    </header>
+    <main class="main-content" id="page-content">
+      <div class="spinner"></div>
+    </main>
+  </div>
+
+</div><!-- /app-shell -->
+
+<div id="toast-container"></div>
+
+<script src="/js/app.js?v=2"></script>
+</body>
+</html>
