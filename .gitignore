@@ -1,0 +1,5 @@
+node_modules/
+.claude/
+uploads/
+*.db-shm
+*.db-wal
